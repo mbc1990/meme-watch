@@ -1,78 +1,77 @@
-from keras.layers import Input, Conv2D, Lambda, merge, Dense, Flatten,MaxPooling2D
-from keras.models import Model, Sequential
-from keras.regularizers import l2
-from keras import backend as K
-from keras.optimizers import SGD,Adam
-from keras.losses import binary_crossentropy
-import numpy.random as rng
+import caffe
 import numpy as np
-import os
-import dill as pickle
-import matplotlib.pyplot as plt
-from sklearn.utils import shuffle
-from PIL import Image
+import sys
+import json
+from scipy.spatial import distance
 
-def W_init(shape,name=None):
-    """Initialize weights as in paper"""
-    values = rng.normal(loc=0,scale=1e-2,size=shape)
-    return K.variable(values,name=name)
+def save_output_values(path_to_image, image_id):
+    layer_data_dir = "layer_data/"
+    caffe_root = "/home/malcolm/Projects/caffe/"
+    sys.path.insert(0, caffe_root + 'python')
+    caffe.set_mode_cpu()
+    model_def = caffe_root + 'models/bvlc_reference_caffenet/deploy.prototxt'
+    model_weights = caffe_root + 'models/bvlc_reference_caffenet/bvlc_reference_caffenet.caffemodel'
+    net = caffe.Net(model_def,      # defines the structure of the model
+                    model_weights,  # contains the trained weights
+                    caffe.TEST)     # use test mode (e.g., don't perform dropout)
 
+    # load the mean ImageNet image (as distributed with Caffe) for subtraction
+    mu = np.load(caffe_root + 'python/caffe/imagenet/ilsvrc_2012_mean.npy')
+    mu = mu.mean(1).mean(1)  # average over pixels to obtain the mean (BGR) pixel values
+    print 'mean-subtracted values:', zip('BGR', mu)
+    
+    # create transformer for the input called 'data'
+    transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
 
-#//TODO: figure out how to initialize layer biases in keras.
-def b_init(shape,name=None):
-    """Initialize bias as in paper"""
-    values=rng.normal(loc=0.5,scale=1e-2,size=shape)
-    return K.variable(values,name=name)
+    transformer.set_transpose('data', (2,0,1))  # move image channels to outermost dimension
+    transformer.set_mean('data', mu)            # subtract the dataset-mean value in each channel
+    transformer.set_raw_scale('data', 255)      # rescale from [0, 1] to [0, 255]
+    transformer.set_channel_swap('data', (2,1,0))  # swap channels from RGB to BGR
+    image = caffe.io.load_image(path_to_image)
+    transformed_image = transformer.preprocess('data', image)
+    # copy the image data into the memory allocated for the net
+    net.blobs['data'].data[...] = transformed_image
+    output = net.forward()
+    layers = net.blobs.keys()
+    for layer in layers:
+        data = net.blobs.get(layer).data.flatten()
+        fname = layer_data_dir + str(image_id) + "." + layer + ".json"
+        with open(fname, 'w') as outfile:
+            json.dump(data.tolist(), outfile)
 
-
-def get_network():
-    # TODO (malcolm): Update input shape to work on color or at least grayscale images
-    input_shape = (150, 150, 3)
-    left_input = Input(input_shape)
-    right_input = Input(input_shape)
-    #build convnet to use in each siamese 'leg'
-    convnet = Sequential()
-    convnet.add(Conv2D(64,(10,10),activation='relu',input_shape=input_shape,
-                       kernel_initializer=W_init,kernel_regularizer=l2(2e-4)))
-    convnet.add(MaxPooling2D())
-    convnet.add(Conv2D(128,(7,7),activation='relu',
-                       kernel_regularizer=l2(2e-4),kernel_initializer=W_init,bias_initializer=b_init))
-    convnet.add(MaxPooling2D())
-    convnet.add(Conv2D(128,(4,4),activation='relu',kernel_initializer=W_init,kernel_regularizer=l2(2e-4),bias_initializer=b_init))
-    convnet.add(MaxPooling2D())
-    convnet.add(Conv2D(256,(4,4),activation='relu',kernel_initializer=W_init,kernel_regularizer=l2(2e-4),bias_initializer=b_init))
-    convnet.add(Flatten())
-    convnet.add(Dense(4096,activation="sigmoid",kernel_regularizer=l2(1e-3),kernel_initializer=W_init,bias_initializer=b_init))
-    #encode each of the two inputs into a vector with the convnet
-    encoded_l = convnet(left_input)
-    encoded_r = convnet(right_input)
-    #merge two encoded inputs with the l1 distance between them
-    L1_distance = lambda x: K.abs(x[0]-x[1])
-    both = merge([encoded_l,encoded_r], mode = L1_distance, output_shape=lambda x: x[0])
-    prediction = Dense(1,activation='sigmoid',bias_initializer=b_init)(both)
-    siamese_net = Model(input=[left_input,right_input],output=prediction)
-    # TODO (malcolm): Why was this commended out?
-    #optimizer = SGD(0.0004,momentum=0.6,nesterov=True,decay=0.0003)
-
-    optimizer = Adam(0.00006)
-    #//TODO: get layerwise learning rates and momentum annealing scheme described in paperworking
-    siamese_net.compile(loss="binary_crossentropy",optimizer=optimizer)
-    return siamese_net
-
-def get_inputs():
-    """
-    Returns inputs for model
-    """
-    # TODO (malcolm) Using the same image here for testing purposes
-    image_a = Image.open("golden.jpg")
-    image_b = Image.open("golden.jpg")
-    return  np.asarray([np.asarray(image_a)]), np.asarray([np.asarray(image_b)])
+def sim_test():
+    layers = [
+        'conv1',
+        'conv2',
+        'conv3',
+        'conv4',
+        'conv5',
+        'fc6',
+        'fc7',
+        'fc8',
+        'norm1',
+        'norm2',
+        'pool1',
+        'pool2',
+        'pool5'
+    ]
+    for layer in layers:
+        data_0 = np.array(json.load(open('layer_data/0'+"."+layer+".json")))
+        data_1 = np.array(json.load(open('layer_data/1'+"."+layer+".json")))
+        dist = distance.cosine(data_0, data_1)
+        print layer + ": " + str(dist)
+        
 
 def main():
-    network = get_network()
-    in_a, in_b = get_inputs()
-    # Need images as numpy arrays here?
-    probs = network.predict([in_a, in_b])
+    sim_test()
+    '''
+    test_images = [
+        'jg1.jpg',
+        'golden.jpg'
+    ]
+    for idx, img in enumerate(test_images):
+        save_output_values(img, idx)
+    '''
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
