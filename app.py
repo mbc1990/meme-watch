@@ -48,4 +48,4 @@ def store_layer_outputs():
             json.dump(data.tolist(), outfile)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=4444)
+    app.run(debug=True, port=4446)
