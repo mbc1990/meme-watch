@@ -15,7 +15,7 @@ def kmeans(input):
         input nparray data to cluster
     """
     print "Clustering..."
-    km = KMeans(n_clusters=1)
+    km = KMeans(n_clusters=8)
     # Run the algorithm
     km.fit(input)
     return km.labels_
@@ -28,10 +28,10 @@ def prepare_data():
     indices = []
     for idx, file in enumerate(files):
         data = json.load(open("layer_data/" + file))
-        input.append(data)
+        input.append(np.array(data))
         indices.append(file.split(".")[0])
         # Initially test with ~1/100th of the data set
-        if counter == 2:
+        if counter == 10:
             return np.array(input), indices
         counter += 1
         print str(counter)
