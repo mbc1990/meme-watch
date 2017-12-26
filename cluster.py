@@ -3,11 +3,10 @@ import numpy as np
 from shutil import copyfile
 from scipy.spatial import distance
 from sklearn.cluster import KMeans
+from sklearn.cluster import AgglomerativeClustering
+
 from sklearn.metrics.pairwise import cosine_similarity
 import json
-
-def new_euclidean_distances(X, Y=None, Y_norm_squared=None, squared=False):
-    return cosine_similarity(X,Y)
 
 def kmeans(input):
     """
@@ -16,30 +15,50 @@ def kmeans(input):
     """
     print "Clustering..."
     km = KMeans(n_clusters=8)
+
     # Run the algorithm
     km.fit(input)
     return km.labels_
 
 
 def prepare_data():
-    files = os.listdir("layer_data/")
+    files = os.listdir("layer_data_fc8/")
     input = []
     counter = 0
     indices = []
     for idx, file in enumerate(files):
-        data = json.load(open("layer_data/" + file))
+        data = json.load(open("layer_data_fc8/" + file))
         input.append(np.array(data))
         indices.append(file.split(".")[0])
-        # Initially test with ~1/100th of the data set
         if counter == 10:
             return np.array(input), indices
         counter += 1
         print str(counter)
 
 
+def cos_sim_affinity(X, Y=None):
+    """
+    Cosine similarity affinity function 
+    """
+    return cosine_similarity(X, Y)
+
+
+def hierarchical(input):
+    """
+    Does hierarchical agglomerative clustering
+    """
+    # TODO: Try complete/maximum linkage
+    ac = AgglomerativeClustering(n_clusters=8, affinity=cos_sim_affinity, linkage="average")
+    ac.fit(input)
+    return ac.labels_
+
+
 def main():
     data, indices = prepare_data()
-    classes = kmeans(data)
+    # TODO: How to handle output of this?
+    classes = hierarchical(data)
+
+    # classes = kmeans(data)
     clusters = {}
     for idx, fname in enumerate(indices):
         cluster = classes[idx]
