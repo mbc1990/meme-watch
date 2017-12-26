@@ -1,9 +1,9 @@
 import os
 import numpy as np
 from shutil import copyfile
-from scipy.spatial import distance
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
+from scipy.spatial.distance import cosine
 from sklearn.decomposition import PCA
 
 from sklearn.metrics.pairwise import cosine_similarity
@@ -35,21 +35,13 @@ def prepare_data():
 
         input.append(arr)
         indices.append(file.split(".")[0])
-        if counter == 25:
-            pca = PCA()
-            res = pca.fit_transform(np.array(input))
-            return res, indices
-            # return np.array(input), indices
+        if counter == 100:
+            # N.B. When passed a matrix of all values, this is really slow
+            # pca = PCA()
+            # res = pca.fit_transform(np.array(input))
+            return np.array(input), indices
         counter += 1
         print str(counter)
-
-
-def cos_sim_affinity(X, Y=None):
-    """
-    Cosine similarity affinity function 
-    """
-    return cosine_similarity(X, Y)
-
 
 def hierarchical(input):
     """
@@ -57,14 +49,14 @@ def hierarchical(input):
     """
     print "Clustering..."
     # TODO: Try complete/maximum linkage
-    ac = AgglomerativeClustering(n_clusters=8, affinity=cos_sim_affinity, linkage="average")
+    # ac = AgglomerativeClustering(n_clusters=8, affinity=cos_sim_affinity, linkage="average")
+    ac = AgglomerativeClustering(n_clusters=8, affinity="cosine", linkage="average")
     ac.fit(input)
     return ac.labels_
 
 
 def main():
     data, indices = prepare_data()
-    # TODO: How to handle output of this?
     classes = hierarchical(data)
 
     # classes = kmeans(data)
