@@ -15,26 +15,30 @@ def kmeans(input):
         input nparray data to cluster
     """
     print "Clustering..."
-    km = KMeans(n_clusters=8)
+    km = KMeans(n_clusters=4)
 
     # Run the algorithm
     km.fit(input)
     return km.labels_
 
 
-def prepare_data():
-    files = os.listdir("layer_data_conv1/")
+def prepare_data(layers):
+    files = os.listdir("saved_memes/")
     input = []
     counter = 0
     indices = []
-    for idx, file in enumerate(files):
-        data = json.load(open("layer_data_conv1/" + file))
+    for file in files:
+        try:
+            file_input = []
+            for layer in layers:
+                path = "layer_data/" + file + "." + layer + ".json"
+                data = json.load(open(path))
+                file_input += data
+        except:
+            continue
 
-        # TODO: Dimensionality reduction? 
-        arr = np.array(data)
-
-        input.append(arr)
-        indices.append(file.split(".")[0])
+        input.append(np.array(file_input))
+        indices.append(file)
         if counter == 100:
             # N.B. When passed a matrix of all values, this is really slow
             # pca = PCA()
@@ -43,21 +47,21 @@ def prepare_data():
         counter += 1
         print str(counter)
 
-def hierarchical(input):
+
+def hierarchical(input, num_clusters):
     """
     Does hierarchical agglomerative clustering
     """
     print "Clustering..."
     # TODO: Try complete/maximum linkage
-    # ac = AgglomerativeClustering(n_clusters=8, affinity=cos_sim_affinity, linkage="average")
-    ac = AgglomerativeClustering(n_clusters=8, affinity="cosine", linkage="average")
+    ac = AgglomerativeClustering(n_clusters=num_clusters, affinity="cosine", linkage="complete")
     ac.fit(input)
     return ac.labels_
 
 
 def main():
-    data, indices = prepare_data()
-    classes = hierarchical(data)
+    data, indices = prepare_data(["pool5", "fc6"])
+    classes = hierarchical(data, 10)
 
     # classes = kmeans(data)
     clusters = {}
