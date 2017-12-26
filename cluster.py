@@ -4,6 +4,7 @@ from shutil import copyfile
 from scipy.spatial import distance
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
+from sklearn.decomposition import PCA
 
 from sklearn.metrics.pairwise import cosine_similarity
 import json
@@ -22,16 +23,23 @@ def kmeans(input):
 
 
 def prepare_data():
-    files = os.listdir("layer_data_fc8/")
+    files = os.listdir("layer_data_conv1/")
     input = []
     counter = 0
     indices = []
     for idx, file in enumerate(files):
-        data = json.load(open("layer_data_fc8/" + file))
-        input.append(np.array(data))
+        data = json.load(open("layer_data_conv1/" + file))
+
+        # TODO: Dimensionality reduction? 
+        arr = np.array(data)
+
+        input.append(arr)
         indices.append(file.split(".")[0])
-        if counter == 10:
-            return np.array(input), indices
+        if counter == 25:
+            pca = PCA()
+            res = pca.fit_transform(np.array(input))
+            return res, indices
+            # return np.array(input), indices
         counter += 1
         print str(counter)
 
@@ -47,6 +55,7 @@ def hierarchical(input):
     """
     Does hierarchical agglomerative clustering
     """
+    print "Clustering..."
     # TODO: Try complete/maximum linkage
     ac = AgglomerativeClustering(n_clusters=8, affinity=cos_sim_affinity, linkage="average")
     ac.fit(input)
