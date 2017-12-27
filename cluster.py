@@ -39,7 +39,7 @@ def prepare_data(layers):
 
         input.append(np.array(file_input))
         indices.append(file)
-        if counter == 100:
+        if counter == 50:
             # N.B. When passed a matrix of all values, this is really slow
             # pca = PCA()
             # res = pca.fit_transform(np.array(input))
@@ -53,15 +53,14 @@ def hierarchical(input, num_clusters):
     Does hierarchical agglomerative clustering
     """
     print "Clustering..."
-    # TODO: Try complete/maximum linkage
     ac = AgglomerativeClustering(n_clusters=num_clusters, affinity="cosine", linkage="complete")
     ac.fit(input)
     return ac.labels_
 
 
 def main():
-    data, indices = prepare_data(["pool5", "fc6"])
-    classes = hierarchical(data, 10)
+    data, indices = prepare_data(["conv1", "conv2", "conv3", "conv4", "conv5","fc6", "fc7", "fc8", "norm1", "norm2", "pool1", "pool2", "pool5"])
+    classes = hierarchical(data, 25)
 
     # classes = kmeans(data)
     clusters = {}
