@@ -24,26 +24,34 @@ def kmeans(input):
 
 def prepare_data(layers):
     files = os.listdir("saved_memes/")
-    input = []
+    
+    # N.B. THESE MUST BE UPDATED TO MATCH THE INPUT DATA
+    num_features = 2449040
+    num_inputs = 201 
+
+    input = np.zeros([num_inputs, num_features])
     counter = 0
     indices = []
-    for file in files:
+    for idx, file in enumerate(files):
         try:
             file_input = []
+            # TODO: This should know each output layer length so it can correctly index into the pre-allocated nparray
             for layer in layers:
                 path = "layer_data/" + file + "." + layer + ".json"
                 data = json.load(open(path))
                 file_input += data
         except:
             continue
+        input[counter] = np.array(file_input)
 
-        input.append(np.array(file_input))
+        # input.append(np.array(file_input))
         indices.append(file)
-        if counter == 50:
+        if counter == 200:
             # N.B. When passed a matrix of all values, this is really slow
+            # TODO: PCA on sampling of data
             # pca = PCA()
             # res = pca.fit_transform(np.array(input))
-            return np.array(input), indices
+            return input, indices
         counter += 1
         print str(counter)
 
@@ -53,14 +61,22 @@ def hierarchical(input, num_clusters):
     Does hierarchical agglomerative clustering
     """
     print "Clustering..."
-    ac = AgglomerativeClustering(n_clusters=num_clusters, affinity="cosine", linkage="complete")
+    ac = AgglomerativeClustering(n_clusters=num_clusters, affinity="cosine", linkage="average")
     ac.fit(input)
     return ac.labels_
 
 
 def main():
-    data, indices = prepare_data(["conv1", "conv2", "conv3", "conv4", "conv5","fc6", "fc7", "fc8", "norm1", "norm2", "pool1", "pool2", "pool5"])
-    classes = hierarchical(data, 25)
+    data, indices = prepare_data([("fc6", 0.75),
+                                  ("fc7", 0.85),
+                                  ("fc8", 1.0), 
+                                  ("norm1", 0.25), 
+                                  ("norm2", 0.35), 
+                                  ("pool1", 0.25), 
+                                  ("pool2", 0.35), 
+                                  ("pool5", 0.85)])
+
+    classes = hierarchical(data, 8)
 
     # classes = kmeans(data)
     clusters = {}
