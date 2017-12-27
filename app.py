@@ -1,3 +1,4 @@
+import os
 from flask import Flask
 from flask import request
 import caffe
@@ -7,12 +8,7 @@ import json
 from scipy.spatial import distance
 
 
-app = Flask(__name__)
-
-@app.route('/store_layer_outputs')
-def store_layer_outputs():
-    path_to_image = request.args.get("filename")
-    image_id = request.args.get("image_id")
+def save_layer_outputs(path_to_image, image_id):
     layer_data_dir = "layer_data/"
     caffe_root = "/home/malcolm/Projects/caffe/"
     sys.path.insert(0, caffe_root + 'python')
@@ -35,17 +31,28 @@ def store_layer_outputs():
     transformer.set_mean('data', mu)            # subtract the dataset-mean value in each channel
     transformer.set_raw_scale('data', 255)      # rescale from [0, 1] to [0, 255]
     transformer.set_channel_swap('data', (2,1,0))  # swap channels from RGB to BGR
-    image = caffe.io.load_image(path_to_image)
+    try:
+        image = caffe.io.load_image(path_to_image)
+    except:
+        return
     transformed_image = transformer.preprocess('data', image)
     # copy the image data into the memory allocated for the net
     net.blobs['data'].data[...] = transformed_image
     output = net.forward()
     layers = net.blobs.keys()
+
+    # Only conv1 layer
     for layer in layers:
         data = net.blobs.get(layer).data.flatten()
         fname = layer_data_dir + str(image_id) + "." + layer + ".json"
         with open(fname, 'w') as outfile:
             json.dump(data.tolist(), outfile)
 
+
 if __name__ == '__main__':
-    app.run(debug=True, port=4446)
+    files = os.listdir("saved_memes/")
+    print files
+    for idx, file in enumerate(files):
+        path = "saved_memes/" + file
+        print idx
+        save_layer_outputs(path, file)
