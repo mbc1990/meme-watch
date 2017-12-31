@@ -49,31 +49,25 @@ def prepare_data(layers):
     Returns: nparray, indices (a map of index in nparray -> filename at that index)
     """
     files = os.listdir("saved_memes/")
+
+    # num_inputs = len(files)
+    num_to_cluster = 10 
     
     # Since we're pre-allocating the np array below, we need to know how
     # many features each layer output has
     num_features = 0
     for layer, weight in layers:
         num_features += layer_lengths[layer]
+    
+    # Every pca_sample_rate vectors, add one to the matrix to be used for PCA
+    pca_sample_rate = 10
+    pca_input = np.zeros([num_to_cluster/pca_sample_rate, num_features])
+    pca_counter = 0
 
-    # N.B. This should be adjusted down if the full data set isn't being used
-    # num_inputs = len(files) 
-    num_inputs = 11
-
-    input = np.zeros([num_inputs, num_features])
+    input = np.zeros([num_to_cluster, num_features])
     counter = 0
     indices = []
     for idx, file in enumerate(files):
-        file_input = []
-        # TODO: This should know each output layer length so it can correctly index into the pre-allocated nparray
-        for layer, weight in layers:
-            path = "layer_data/" + file + "." + layer + ".json"
-            data = json.load(open(path))
-            file_input += data
-
-        input[counter] = np.array(file_input)
-        indices.append(file)
-
         # Short circuit early bc not enough memory
         if counter == 10:
             # N.B. When passed a matrix of all values, this is really slow
@@ -81,6 +75,21 @@ def prepare_data(layers):
             # pca = PCA()
             # res = pca.fit_transform(np.array(input))
             return input, indices
+
+        file_input = []
+        # TODO: This should know each output layer length so it can correctly index into the pre-allocated nparray
+        for layer, weight in layers:
+            path = "layer_data/" + file + "." + layer + ".json"
+            data = json.load(open(path))
+            file_input += data
+        input[counter] = np.array(file_input)
+        indices.append(file)
+        
+        # If we're going to use the vector in PCA, add it to that array
+        if idx % pca_sample_rate == 0:
+            pca_input[pca_counter] = np.array(file_input)
+            pca_counter += 1
+
         counter += 1
         print str(counter)
 
