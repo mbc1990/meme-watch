@@ -1,13 +1,14 @@
 import os
+import json
+from sets import Set
 import numpy as np
 from shutil import copyfile
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 from scipy.spatial.distance import cosine
 from sklearn.decomposition import PCA
-
 from sklearn.metrics.pairwise import cosine_similarity
-import json
+from tesserocr import PyTessBaseAPI
 
 # Number of entries in each feature vector
 layer_lengths = {
@@ -32,7 +33,7 @@ def kmeans(input):
         input nparray data to cluster
     """
     print "Clustering..."
-    km = KMeans(n_clusters=4)
+    km = KMeans(n_clusters=10)
 
     # Run the algorithm
     km.fit(input)
@@ -50,8 +51,8 @@ def prepare_data(layers):
     """
     files = os.listdir("saved_memes/")
 
-    # num_inputs = len(files)
-    num_to_cluster = 10 
+    # num_to_cluster = len(files)
+    num_to_cluster = 100
     
     # Since we're pre-allocating the np array below, we need to know how
     # many features each layer output has
@@ -106,17 +107,81 @@ def hierarchical(input, num_clusters):
     return ac.labels_
 
 
-def main():
-    data, indices = prepare_data([("fc6", 0.75),
-                                  ("fc7", 0.85),
-                                  ("fc8", 1.0), 
-                                  ("norm1", 0.25), 
-                                  ("norm2", 0.35), 
-                                  ("pool1", 0.25), 
-                                  ("pool2", 0.35), 
-                                  ("pool5", 0.85)])
+def multi_cluster():
+    """
+    Run clustering separately on each layer output, then... what?
+    """
+    pass
 
-    classes = hierarchical(data, 8)
+
+def text_cluster(clusters):
+    """
+    Cluster based on extracted text from images
+    """
+    files = os.listdir("saved_memes/")
+
+    num_to_cluster = len(files)
+    
+    seen_tokens = Set()
+
+    # Get unordered word vector for each image
+    extracted_texts = []
+    with PyTessBaseAPI() as api:
+        for idx, file in enumerate(files):
+            print idx
+            api.SetImageFile("saved_memes/" + file)
+            text = api.GetUTF8Text()
+
+            bag_of_words = {} 
+            text = text.lower()
+
+            # Throw out images we couldn't extract text from
+            if len(text) < 5:
+                num_to_cluster -= 1
+                continue
+
+            spl = text.split(" ")
+            for token in spl:
+                seen_tokens.add(token)
+                if token not in bag_of_words:
+                    bag_of_words[token] = 0
+                bag_of_words[token] += 1
+            extracted_texts.append({"filename": file, "bag_of_words": bag_of_words})
+
+    print "Clustering " + str(len(extracted_texts)) + " images"
+    
+    # word -> index in input vector
+    word_index = {}
+    counter = 0
+    for token in seen_tokens:
+        word_index[token] = counter
+        counter += 1
+
+    indices = {}
+
+    input = np.zeros([num_to_cluster, len(seen_tokens)])
+    counter = 0
+    for bow in extracted_texts:
+        indices[bow["filename"]] = counter
+        for key in bow["bag_of_words"].keys():
+            input[counter][word_index[key]] = bow["bag_of_words"][key]
+        counter += 1
+
+    classes = hierarchical(input, clusters)
+    return classes, indices
+
+
+
+def main():
+    '''
+    data, indices = prepare_data([("conv1", 0.5),
+                                  ("conv2", 0.75),
+                                  ("fc7", 0.85),
+                                  ("fc8", 1.0)])
+    classes = hierarchical(data, 40)
+    '''
+
+    classes, indices = text_cluster(25)
 
     clusters = {}
     for idx, fname in enumerate(indices):
