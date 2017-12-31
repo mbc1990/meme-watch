@@ -60,7 +60,7 @@ def prepare_data(layers):
         num_features += layer_lengths[layer]
     
     # Every pca_sample_rate vectors, add one to the matrix to be used for PCA
-    pca_sample_rate = 10
+    pca_sample_rate = 2 
     pca_input = np.zeros([num_to_cluster/pca_sample_rate, num_features])
     pca_counter = 0
 
@@ -69,11 +69,13 @@ def prepare_data(layers):
     indices = []
     for idx, file in enumerate(files):
         # Short circuit early bc not enough memory
-        if counter == 10:
-            # N.B. When passed a matrix of all values, this is really slow
-            # TODO: PCA on sampling of data
-            # pca = PCA()
-            # res = pca.fit_transform(np.array(input))
+        if counter == num_to_cluster:
+            # Fit on a sampling of input data
+            pca = PCA()
+            pca.fit(pca_input)
+
+            # But transform the whole input matrix
+            # input = pca.transform(input)
             return input, indices
 
         file_input = []
