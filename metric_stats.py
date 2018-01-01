@@ -61,6 +61,36 @@ def avg_distance_per_image():
             avg = total / float(len(images) - 1)
             print "    " + layer + " :" + str(avg)
 
+def text_metrics():
+    """
+    Look into what kind of text we could extract
+    """
+    files = os.listdir("text_data/")
+
+    # Total length in words of all extracted text (for average)
+    total_len = 0.0
+
+    # Documents with any extracted text
+    with_text = 0
+
+    for file in files:
+        data = json.load(open("text_data/" + file))
+        # Strip newline characters
+        data = data.replace("\n", "")
+
+        words = data.split(" ")
+        # Strip empty tokens
+        words = [word for word in words if word != ""]
+        if len(words) > 10:
+            total_len += len(words)
+            print words
+            print "---"
+            with_text += 1
+
+    avg = total_len / len(files)
+    print "Average length: " + str(avg) + " words"
+    print str(float(with_text)/len(files) * 100) + "% of files with text ("+str(with_text) + "/" + str(len(files))+")"
+
 
 def most_similar(img, top_n=10):
     """
@@ -101,7 +131,8 @@ def get_layer_sizes():
 
 def main():
     # avg_distance_per_image()    
-    get_layer_sizes()
+    # get_layer_sizes()
+    text_metrics()
     
 
 if __name__ == "__main__":

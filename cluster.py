@@ -114,13 +114,35 @@ def multi_cluster():
     pass
 
 
+def extract_text():
+    """
+    Runs OCR on input images and saves the results
+    """
+
+    files = os.listdir("saved_memes/")
+    with PyTessBaseAPI() as api:
+        for idx, file in enumerate(files):
+            if not os.path.exists("text_data/" + file + ".text.json"):
+                print idx
+                api.SetImageFile("saved_memes/" + file)
+                text = api.GetUTF8Text()
+                output = {
+                        "text": text
+                }
+                with open("text_data/" + file + ".text.json", 'w') as outfile:
+                    json.dump(text, outfile)
+
+
 def text_cluster(clusters):
     """
     Cluster based on extracted text from images
     """
     files = os.listdir("saved_memes/")
+    # files = files[:26]
 
     num_to_cluster = len(files)
+
+    # num_to_cluster = 26
     
     seen_tokens = Set()
 
@@ -129,19 +151,35 @@ def text_cluster(clusters):
     with PyTessBaseAPI() as api:
         for idx, file in enumerate(files):
             print idx
-            api.SetImageFile("saved_memes/" + file)
-            text = api.GetUTF8Text()
+
+            # Get text from disk, or run OCR if we dont have it
+            text = ""
+            if os.path.exists("text_data/" + file + ".text.json"):
+                text = json.load(open("text_data/" + file + ".text.json"))
+            else:
+                api.SetImageFile("saved_memes/" + file)
+                text = api.GetUTF8Text()
+                # TODO: save to disk if we do this
+
+            # Clean up text
+            text = text.lower()
+            text = text.replace("\n", "")
+
+            words = text.split(" ")
+            # Strip empty tokens
+            words = [word for word in words if word != ""]
+
+            # TODO: Remove stopwords
+            # TODO: TF-IDF
 
             bag_of_words = {} 
-            text = text.lower()
 
             # Throw out images we couldn't extract text from
-            if len(text) < 5:
+            if len(words) < 5:
                 num_to_cluster -= 1
                 continue
 
-            spl = text.split(" ")
-            for token in spl:
+            for token in words:
                 seen_tokens.add(token)
                 if token not in bag_of_words:
                     bag_of_words[token] = 0
@@ -165,6 +203,12 @@ def text_cluster(clusters):
         indices[bow["filename"]] = counter
         for key in bow["bag_of_words"].keys():
             input[counter][word_index[key]] = bow["bag_of_words"][key]
+
+        # Normalize word vector 
+        norm = np.linalg.norm(input[counter], ord=1)            
+        print "Norm: " + str(norm)
+        input[counter] /= norm
+
         counter += 1
 
     classes = hierarchical(input, clusters)
