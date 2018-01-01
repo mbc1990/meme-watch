@@ -51,8 +51,7 @@ def prepare_data(layers):
     """
     files = os.listdir("saved_memes/")
 
-    # num_to_cluster = len(files)
-    num_to_cluster = 100
+    num_to_cluster = len(files)
     
     # Since we're pre-allocating the np array below, we need to know how
     # many features each layer output has
@@ -76,7 +75,7 @@ def prepare_data(layers):
             pca.fit(pca_input)
 
             # But transform the whole input matrix
-            # input = pca.transform(input)
+            input = pca.transform(input)
             return input, indices
 
         file_input = []
